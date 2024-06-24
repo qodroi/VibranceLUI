@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+vibrancelui
+
+# Prerequisites
+*.d
+
+# Image formats
+*.webp
+*.png
+*.jpg
+
+TODO

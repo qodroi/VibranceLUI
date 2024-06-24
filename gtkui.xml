@@ -1,0 +1,52 @@
+<!-- SPDX-License-Identifier: GPL-2.0-only -->
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="org.gtk.qodroi.vibrancelui">
+	<requires lib="gtk" version="4.0"/>
+	<object class="GtkApplicationWindow" id="win">
+		<property name="title">VibranceLUI</property>
+		<property name="default-width">419</property>
+		<property name="default-height">524</property>
+		<property name="resizable">false</property>
+		<child>
+			<object class="GtkFixed" id="fixed">
+				<child>
+					<object class="GtkCheckButton" id="checkbtn">
+						<property name="label">Affect All Monitors</property>
+					</object>
+				</child>
+				<child>
+					<object class="GtkLabel" id="creditlb">
+						<attributes>
+							<attribute name="weight" value="PANGO_WEIGHT_MEDIUM"/>
+						</attributes>
+					</object>
+				</child>
+				<child>
+					<object class="GtkLabel" id="releasebeta">
+						<property name="label">Beta</property>
+						<attributes>
+							<attribute name="weight" value="PANGO_WEIGHT_THIN"/>
+						</attributes>
+					</object>
+				</child>
+				<child>
+					<object class="GtkScale" id="vscale">
+						<property name="orientation">GTK_ORIENTATION_HORIZONTAL</property>
+						<property name="draw-value">TRUE</property>
+						<property name="value-pos">GTK_POS_RIGHT</property>
+						<property name="digits">0</property>
+						<property name="width-request">200</property>
+						<property name="adjustment">
+						<object class="GtkAdjustment">
+							<property name="lower">0</property>
+							<property name="upper">100</property>
+						</object>
+						</property>
+					</object>
+				</child>
+			</object>
+		</child>
+	</object>
+</interface>
