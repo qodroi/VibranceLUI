@@ -16,5 +16,5 @@ Pull requests and feature suggestions are always welcome.
 
 ## Screenshots
 
-![VibranceLUI image](https://github.com/qodroi/vibrancelui/tree/master/assets/app-screenshot.png)
+![VibranceLUI image](assets/app-screenshot.png)
 

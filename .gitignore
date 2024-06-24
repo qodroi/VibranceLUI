@@ -5,9 +5,4 @@ vibrancelui
 # Prerequisites
 *.d
 
-# Image formats
-*.webp
-*.png
-*.jpg
-
 TODO
