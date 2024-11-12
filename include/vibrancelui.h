@@ -1,14 +1,29 @@
-// SPDX-License-Identifier: GPL-2.0-only
+/*
+ *   Copyright (c) 2024 Roi
+
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef VIBRANCELUI_H
 #define VIBRANCELUI_H
 
+#include <stdbool.h>
 #include <inttypes.h>
-#include <X11/Xlib.h>
 #include <NVCtrl/NVCtrl.h>
 #include <NVCtrl/NVCtrlLib.h>
 
-#include "gtkgui.h"
+#include "vibgui.h"
 
 #define DIE(msg) do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
@@ -38,7 +53,7 @@ typedef struct global_display {
 } global_display_t;
 
 /* Convert between digital vibrance value to a percentage */
-static inline int
+static __always_inline int
 dv_value_to_percentage(int value, monitor_config_t *monitor)
 {
     return ((value - monitor->min_vibrance) * (100)) /
@@ -46,11 +61,11 @@ dv_value_to_percentage(int value, monitor_config_t *monitor)
 }
 
 /* Convert between digital vibrance percentage to value */
-static inline int
+static __always_inline int
 dv_percentage_to_value(int percentage, monitor_config_t *monitor)
 {
-    return (1.0f/100.0f) * ((percentage * monitor->max_vibrance) +
-            (100 * monitor->min_vibrance) - (percentage * monitor->min_vibrance));
+    return (1.0f/100.0f) * ((percentage * (monitor ? monitor->max_vibrance : 1023)) +
+            (100 * (monitor ? monitor->min_vibrance : -1024)) - (percentage * (monitor ? monitor->min_vibrance : -1024)));
 }
 
 void set_monitor_vibrance(int, int,

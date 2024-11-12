@@ -1,4 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0-only
+/*
+ *   Copyright (c) 2024 Roi
+
+ *   VibranceLUI core that communicated with Nvidia API & does some init stuff.
+
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,17 +71,13 @@ set_monitor_vibrance(int monitor_number, int vibrance_level,
     // int ret_vibrance = 0;
     int mon = 0; /* None of my monitors have dpyID of 0, but just in case. */
 
+
     if ((!(monitor_conf.min_vibrance <= vibrance_level && vibrance_level <= monitor_conf.max_vibrance
             )) || (vibrance_level == 0 && !monitor_conf.is_active))
         return;
 
-    /* FIXME: We assume @gdisplay.dpy (*Display) is still open, though it may
-     * have been closed by the time @main calls XOpenDisplay
-
-     -----
-
-     Use gdisplay.monitors[index].dpyID instead of mon
-    */
+    // if (gdk_display_is_closed(gdisplay))
+    //     return; /* FURTHER STEPS */
 
     do {
         XNVCTRLSetTargetAttribute(gdisplay.dpy, /* Dpy */
@@ -74,13 +88,6 @@ set_monitor_vibrance(int monitor_number, int vibrance_level,
                                 vibrance_level);
     } while (affect_all && mon++ <= nm);
     XFlush(gdisplay.dpy); /* We want it right after the setting */
-
-    // get_monitor_digital_vibrance(&ret_vibrance, monitor_conf.dpyId);
-    // if (ret_vibrance != vibrance_level) {
-    //     DEBUG_PRINTF("failed to set vibrance lvl to: %d (%d) on display: %s\n",
-    //          vibrance_level, ret_vibrance, XDisplayName(NULL));
-    //     return;
-    // }
 }
 
 /* Query the valid range of vibrance level for the specified monitor */

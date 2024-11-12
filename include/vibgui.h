@@ -15,35 +15,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* Main window */
-window {
-	background-color: #c2bdbd;
-}
+#ifndef VIBGUI_H
+#define VIBGUI_H
 
-window label {
-	color: black;
-}
+#define MAXIMUM_MONITOR_ARRAY_COUNT		15 /* more comfortable in
+			case of a value change in monitors number */
 
-scale {
-	color:black;
-}
+int do_init_gtk_window();
 
-/* All check-buttons' label (text) within the box */
-checkbutton label {
-	color: black;
-}
-
-/* All widgets within the Box */
-box * {
-	font: 13px Fira Code bold;
-	font-weight: 400;
-}
-
-/* VibranceLUI application's header-bar (title bar) */
-headerbar.titlebar {
-	border: none;
-	box-shadow: none;
-	background-image: linear-gradient(to bottom,
-	shade(rgb(227, 222, 222), 1.05),
-	shade(rgb(229, 224, 224), 1.00));
-}
+#endif /* VIBGUI_H */
