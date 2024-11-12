@@ -14,7 +14,7 @@ TBD
 
 Pull requests and feature suggestions are always welcome.
 
-## Screenshots (I know it's ugly)
+## Screenshots
 
 ![VibranceLUI image](assets/app-screenshot.png)
 
