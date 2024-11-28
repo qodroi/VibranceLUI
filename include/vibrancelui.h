@@ -18,12 +18,15 @@
 #ifndef VIBRANCELUI_H
 #define VIBRANCELUI_H
 
-#include <stdbool.h>
-#include <inttypes.h>
+#include <gtk/gtk.h>
 #include <NVCtrl/NVCtrl.h>
 #include <NVCtrl/NVCtrlLib.h>
 
-#include "vibgui.h"
+#include "vgui.h"
+
+#define DEFAULT_DP_VIBRANCE_LEVEL           0
+#define DEFAULT_MAX_VIBRANCE_LEVEL          1023
+#define DEFAULT_MIN_VIBRANCE_LEVEL          -1024
 
 #define DIE(msg) do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
@@ -36,42 +39,53 @@
 
 typedef struct per_monitor_settings {
     int vibrance_level;
+    int width, height;
     int64_t max_vibrance,
             min_vibrance;
-    bool is_active;
     int dpyId;
 } monitor_config_t;
 
-/* TODO: Implement @monitors as linked list */
 typedef struct global_display {
+    pthread_spinlock_t lock;
     Display *dpy;
-    monitor_config_t *monitors;
-    /* @data - array taken from XNVCTRLQueryTargetBinaryData.
-        number of displays is in @ndisplays */
-    int *data;
-    int ndisplays;
+    monitor_config_t *monitors_conf;
+    int *data; /* array taken from XNVCTRLQueryTargetBinaryData */
+    int ndisplays; /* "Screen" by X11's defintion is different. */
 } global_display_t;
 
+/* Private user configuartion structure */
+typedef struct app_user_data {
+	GdkDisplay *user_gdk_display;
+	GListModel *glist_monitors; /* Monitors belong to Display (user_display) */
+	guint nm; /* Number of monitors (fetched from GListModel) */
+	bool affect_all; /* Affect all monitors? */
+	int dropd_def_mon; /* Default monitor to affect; set by DropDown */
+} user_data_t;
+
 /* Convert between digital vibrance value to a percentage */
-static __always_inline int
-dv_value_to_percentage(int value, monitor_config_t *monitor)
+int inline
+dv_value_to_percentage(int value, monitor_config_t *monitor_conf)
 {
-    return ((value - monitor->min_vibrance) * (100)) /
-                (monitor->max_vibrance - monitor->min_vibrance);
+    return ((value - monitor_conf->min_vibrance) * (100)) /
+                (monitor_conf->max_vibrance - monitor_conf->min_vibrance);
 }
 
 /* Convert between digital vibrance percentage to value */
-static __always_inline int
-dv_percentage_to_value(int percentage, monitor_config_t *monitor)
+int inline
+dv_percentage_to_value(int percentage, monitor_config_t *monitor_conf)
 {
-    return (1.0f/100.0f) * ((percentage * (monitor ? monitor->max_vibrance : 1023)) +
-            (100 * (monitor ? monitor->min_vibrance : -1024)) - (percentage * (monitor ? monitor->min_vibrance : -1024)));
+    return (1.0f/100.0f) * ((percentage * (monitor_conf ? monitor_conf->max_vibrance : 1023)) +      \
+            (100 * (monitor_conf ? monitor_conf->min_vibrance : -1024)) -                            \
+            (percentage * (monitor_conf ? monitor_conf->min_vibrance : -1024)));
 }
 
 void set_monitor_vibrance(int, int,
-                        bool, unsigned int);
-bool get_monitor_digital_vibrance(int *, int);
-extern global_display_t gdisplay;
+                        bool);
+bool get_monitor_vibrance(int *, int);
 
+void __reset_monitor_vibrance(int, bool);
+
+extern global_display_t gdisplay;
+extern user_data_t user_data;
 
 #endif /* VIBRANCELUI_H */

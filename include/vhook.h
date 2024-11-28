@@ -15,12 +15,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef VIBGUI_H
-#define VIBGUI_H
 
-#define MAXIMUM_MONITOR_ARRAY_COUNT		15 /* more comfortable in
-			case of a value change in monitors number */
+#ifndef VHOOK_H
+#define VHOOK_H
 
-int do_init_gtk_window();
+#define MAXSTR      1000
 
-#endif /* VIBGUI_H */
+void *vib_app_hook_thread_start(void *);
+
+#endif /* VHOOK_H */

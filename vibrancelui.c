@@ -18,10 +18,7 @@
  */
 
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
+#include <X11/extensions/Xinerama.h>
 
 #include "vibrancelui.h"
 
@@ -41,7 +38,7 @@ int __attribute__((weak)) GetNvXScreen(Display *dpy)
 
     for (screen = 0; screen < ScreenCount(dpy); screen++) {
         if (XNVCTRLIsNvScreen(dpy, screen)) {
-            printf("Default X screen %d is not an NVIDIA X screen.  "
+            DEBUG_PRINTF("Default X screen %d is not an NVIDIA X screen.  "
                    "Using X screen %d instead.\n",
                    def_scn, screen);
             return screen;
@@ -51,54 +48,59 @@ int __attribute__((weak)) GetNvXScreen(Display *dpy)
     DIE("Unable to find any NVIDIA X screens; aborting.\n");
 }
 
-/* Query the current set digital vibrance for the given @ndisplay,
- * and store the return value in vibrance
+/* Query the current applied digital vibrance for the given @dpyId,
+ * and store the return value in @ret_vibrance
  */
-bool __always_inline
-get_monitor_digital_vibrance(int *ret_vibrance, int dpyId)
+bool
+get_monitor_vibrance(int *ret_vibrance, int dpyId)
 {
     return XNVCTRLQueryTargetAttribute(gdisplay.dpy, NV_CTRL_TARGET_TYPE_DISPLAY,
         dpyId, 0, NV_CTRL_DIGITAL_VIBRANCE, ret_vibrance);
 }
 
-/* Set the Digital Vibrance of the specified @monitor
+/* Clear @monitor(s) digital vibrance */
+void __always_inline __reset_monitor_vibrance(int monitor_number, bool affect_all)
+{
+    set_monitor_vibrance(monitor_number, 0, affect_all);
+}
+
+/* Set the digital vibrance of the specified @monitor(s)
      to the target @vibrance_level value */
 void
 set_monitor_vibrance(int monitor_number, int vibrance_level,
-                        bool affect_all, unsigned int nm)
+                        bool affect_all)
 {
-    monitor_config_t monitor_conf = gdisplay.monitors[monitor_number];
-    // int ret_vibrance = 0;
-    int mon = 0; /* None of my monitors have dpyID of 0, but just in case. */
+    monitor_config_t monitor_conf = gdisplay.monitors_conf[monitor_number];
+    int dpyid = 0; /* None of my monitors have dpyID of 0, but just in case. */
 
-
-    if ((!(monitor_conf.min_vibrance <= vibrance_level && vibrance_level <= monitor_conf.max_vibrance
-            )) || (vibrance_level == 0 && !monitor_conf.is_active))
-        return;
-
-    // if (gdk_display_is_closed(gdisplay))
-    //     return; /* FURTHER STEPS */
+   	/* 	Check if @vibrance_level is NOT within the acceptable range. 
+		NOTE: This relies on one monitor configuration, I assume they all
+		have the same min\max vibrance configuration.
+	*/
+   	if (!(monitor_conf.min_vibrance <= vibrance_level &&
+			vibrance_level <= monitor_conf.max_vibrance))
+		return;
 
     do {
-        XNVCTRLSetTargetAttribute(gdisplay.dpy, /* Dpy */
+        XNVCTRLSetTargetAttribute(gdisplay.dpy,
                                 NV_CTRL_TARGET_TYPE_DISPLAY,
-                                affect_all == false ? monitor_conf.dpyId : mon, /* dpyID */
+                                affect_all == false ? monitor_conf.dpyId : dpyid,
                                 0, /* Leave it zero */
                                 NV_CTRL_DIGITAL_VIBRANCE,
                                 vibrance_level);
-    } while (affect_all && mon++ <= nm);
-    XFlush(gdisplay.dpy); /* We want it right after the setting */
+    } while (affect_all && dpyid++ <= user_data.nm);
+    XFlush(gdisplay.dpy);
 }
 
 /* Query the valid range of vibrance level for the specified monitor */
-static int query_valid_vibrance_levels(monitor_config_t *monitor, int ndisplay)
+static int query_valid_vibrance_levels(monitor_config_t *monitor_conf, int dpyid)
 {
     NVCTRLAttributeValidValuesRec valid_values;
     int ret;
 
     ret = XNVCTRLQueryValidTargetAttributeValues(gdisplay.dpy,
                 NV_CTRL_TARGET_TYPE_DISPLAY,
-                ndisplay,
+                dpyid,
                 0,
                 NV_CTRL_DIGITAL_VIBRANCE,
                 &valid_values);
@@ -107,16 +109,31 @@ static int query_valid_vibrance_levels(monitor_config_t *monitor, int ndisplay)
     if (valid_values.type != ATTRIBUTE_TYPE_RANGE)
         return -1;
 
-    monitor->min_vibrance = valid_values.u.range.min;
-    monitor->max_vibrance = valid_values.u.range.max;
+    monitor_conf->min_vibrance = valid_values.u.range.min;
+    monitor_conf->max_vibrance = valid_values.u.range.max;
 
     return 0;
 }
 
-/* Initalize display configuration and data on program launch */
-static int device_config_init(int nvscreen)
+static void query_mon_height_and_width(monitor_config_t *monitor_conf, int scrn)
 {
-    int i;
+    XineramaScreenInfo *xine_scr;
+    int n_entries;
+
+    xine_scr = XineramaQueryScreens(gdisplay.dpy, &n_entries);
+    if (xine_scr == NULL)
+        return;
+    
+    monitor_conf->height = xine_scr[scrn].height;
+    monitor_conf->width = xine_scr[scrn].width;
+
+    XFree(xine_scr);
+}
+
+/* Initalize display configuration and data on program launch */
+static int device_display_config_init(int nvscreen)
+{
+    int dpyid, mon_index;
 
     XNVCTRLQueryTargetBinaryData(gdisplay.dpy,
                                 NV_CTRL_TARGET_TYPE_X_SCREEN,
@@ -127,17 +144,17 @@ static int device_config_init(int nvscreen)
                                 NULL);
     gdisplay.ndisplays = gdisplay.data[0];
 
-    gdisplay.monitors = malloc(sizeof(*gdisplay.monitors) * gdisplay.ndisplays);
-    if (!gdisplay.monitors)
-        DIE("Unable to allocate memory for internal structure\n");
-    memset(gdisplay.monitors, 0, sizeof(*gdisplay.monitors) * gdisplay.ndisplays);
+    gdisplay.monitors_conf = calloc(sizeof(*gdisplay.monitors_conf) *
+                 gdisplay.ndisplays, sizeof(*gdisplay.monitors_conf));
+    if (gdisplay.monitors_conf == NULL)
+        DIE("Failed to allocate memory for internal structure\n");
 
-    for (i = 1; i <= gdisplay.ndisplays; i++) {
-        get_monitor_digital_vibrance(&gdisplay.monitors[i - 1].vibrance_level, i);
-        if (gdisplay.monitors[i - 1].vibrance_level != 0)
-            gdisplay.monitors[i - 1].is_active = true;
-        gdisplay.monitors[i - 1].dpyId = i;
-        query_valid_vibrance_levels(&gdisplay.monitors[i - 1], i);
+    for (dpyid = 1, mon_index = 0; dpyid <= gdisplay.ndisplays; dpyid++, mon_index++) 
+    {
+        get_monitor_vibrance(&gdisplay.monitors_conf[mon_index].vibrance_level, dpyid);
+        gdisplay.monitors_conf[mon_index].dpyId = dpyid;
+        query_valid_vibrance_levels(&gdisplay.monitors_conf[mon_index], dpyid);
+        query_mon_height_and_width(&gdisplay.monitors_conf[mon_index], mon_index);
     }
 
     return 0;
@@ -155,9 +172,11 @@ int main(int argc, char const *argv[])
         DIE("XOpenDisplay");
     gdisplay.dpy = dpy;
 
+    pthread_spin_init(&gdisplay.lock, PTHREAD_PROCESS_PRIVATE);
     nvscreen = GetNvXScreen(gdisplay.dpy);
-
-    device_config_init(nvscreen);
+    device_display_config_init(nvscreen);
     do_init_gtk_window(argc, argv);
+    pthread_spin_destroy(&gdisplay.lock);
+
 	return 0;
 }

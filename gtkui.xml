@@ -32,6 +32,13 @@
 					</object>
 				</child>
 				<child>
+					<object class="GtkEntry" id="process_list">
+						<property name="placeholder-text">Process ID</property>
+						<property name="max-length">7</property>
+						<property name="width-chars">13</property>
+					</object>
+				</child>
+				<child>
 					<object class="GtkScale" id="vscale">
 						<property name="orientation">GTK_ORIENTATION_HORIZONTAL</property>
 						<property name="draw-value">TRUE</property>
