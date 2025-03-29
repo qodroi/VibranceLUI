@@ -18,6 +18,7 @@
 #include <X11/Xatom.h>
 
 #include "vibrancelui.h"
+#include "ghashtable.h"
 #include "vhook.h"
 
 unsigned char *prop;
@@ -108,6 +109,7 @@ handle_active_window(unsigned long active_window)
 {
     unsigned long window_pid;
     char pid_buf[21 + 1] = { 0 };
+    const char *dv_level_for_pid;
 
     __reset_monitor_vibrance(0, true); /* Focus was changed.
                 Reset all monitors digital vibrance */
@@ -120,21 +122,29 @@ handle_active_window(unsigned long active_window)
     if (window_pid == 0)
         return false;
 
+#ifdef DEBUG
     /* Note that @active_window is actually just the Window's ID */
-    DEBUG_PRINTF("%s %lx %lx\n", get_window_name(active_window), active_window, window_pid);
+    DEBUG_PRINTF("%s %lx %lu\n", get_window_name(active_window), active_window, window_pid);
+#endif
 
     /* FIXME: Currently we set vibrance on _all_ monitors;
-        Find the monitor that the application was opened in */
+        Find the monitor that the application was opened on */
     
     snprintf(pid_buf, sizeof(pid_buf), "%lu", window_pid);
-    if (g_hash_table_contains(g_hash_table_apps, &pid_buf)) {
-        if (is_window_full_screen(active_window)) {
-            set_monitor_vibrance(0, DEFAULT_MAX_VIBRANCE_LEVEL,
-                                    true);
-            return true;
-        }
-    }
 
+    if ((dv_level_for_pid = fetch_vlevel_for_spid_ht(pid_buf)) == NULL)
+        return false;
+    if (is_window_full_screen(active_window)) 
+    {
+        int _v = 0;
+    
+        _v = strtol(dv_level_for_pid, (char **)NULL, 10);
+        _v = dv_percentage_to_value(_v > 100 ? 100 : _v, NULL);
+
+        set_monitor_vibrance(0, _v, true); /* FIXME: Change "true" to current primary monitor */
+        return true;
+    }
+    
     return false;
 }
 
@@ -150,19 +160,22 @@ void *vib_app_hook_thread_start(void *)
 
     XSelectInput(gdisplay.dpy, w, PropertyChangeMask);
 
-    /* Uses spinlock to prevent race condition with gdisplay.dpy being null
-        after application close, with this functions runs one last time after app close.
+    /* Use spinlock to prevent TOCTOU race condition with @gdisplay.dpy being null
+        after application close, with this function possibly runs one last time after close.
+        Though quite heavy, that's the only solution I found.
 
-        Though quite heavy, that's the only solution I found. FIXME: Look for a better one.
+		I think we could use atomic operations on @gdisplay.dpy, but I need to figure out
+        how to implement it correctly.
     */
     for (;;) {
+		/* Expect positive return value,
+			 as until close no one wil take the lock. */
         if (__builtin_expect(pthread_spin_trylock(&gdisplay.lock), 0))
             break;
         XNextEvent(gdisplay.dpy, &e);
-        if (e.type == PropertyNotify) 
+        if (e.type == PropertyNotify)
         {
             if (!strcmp(XGetAtomName(gdisplay.dpy, e.xproperty.atom), "_NET_ACTIVE_WINDOW")) {
-                /* continue if active window is the desktop */
                 active_window = get_active_window_id(w);
                 handle_active_window(active_window);
             }

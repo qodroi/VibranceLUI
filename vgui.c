@@ -19,6 +19,7 @@
 
 #include "vibrancelui.h"
 #include "vhook.h"
+#include "ghashtable.h"
 
 /* Used as a "package" for @g_signal_connect for
 	the passed fuction's data. */
@@ -36,7 +37,6 @@ struct g_app_config {
 	const char *spid; /* Process ID of app */
 };
 
-GHashTable *g_hash_table_apps;
 GThread *gthread_p;
 
 /* FIXME: 
@@ -49,7 +49,7 @@ GThread *gthread_p;
 static void vibrance_scale_callback()
 {
 	int integer_vibrance_scale;
-	gdouble arg_range_val;
+	gdouble __attribute_maybe_unused__ arg_range_val;
 	int monitor_number = user_data.dropd_def_mon; /* specified monitor number */
 
 	integer_vibrance_scale = dv_percentage_to_value(
@@ -58,7 +58,9 @@ static void vibrance_scale_callback()
 	arg_range_val = gtk_range_get_value(GTK_RANGE(pwidgets.pvscale));
 	set_monitor_vibrance(monitor_number, integer_vibrance_scale, user_data.affect_all);
 
+#ifdef DEBUG
 	DEBUG_PRINTF("%g %d %d\n", arg_range_val, integer_vibrance_scale, user_data.affect_all);
+#endif
 }
 
 /* Called when the "Affect all" button is pressed.
@@ -82,49 +84,22 @@ static void dropdown_selected_callback(GtkDropDown *self)
 	gtk_range_set_value(GTK_RANGE(pwidgets.pvscale), dv);
 }
 
-static void __always_inline g_hash_table_printall(void *key, void *value, void *userdata)
+static void pid_entry_submit_callback(GtkEntry *self, GtkEntry *vib_level)
 {
-	DEBUG_PRINTF("%s %d\n", (char *)key, *(int *)value);
-}
-
-static void __always_inline g_app_config_struct_free(void *g_acfg)
-{
-	g_free(g_acfg); /* typeof struct g_app_config */
-}
-
-static struct g_app_config *g_hash_app_config_struct(const char *spid)
-{
-	struct g_app_config *p_config_app;
-	
-	p_config_app =  g_malloc(sizeof(*p_config_app));
-	if (p_config_app == NULL)
-		return NULL;
-	
-	p_config_app->spid = spid;
-	p_config_app->vibrance_level = DEFAULT_MAX_VIBRANCE_LEVEL; /* TBD */
-
-	return p_config_app;
-
-}
-
-static void pid_entry_submit_callback(GtkEntry *self)
-{
-	const char *spid;
+	char *spid, *vlevel;
 
 	/* Get the user supplied process ID */
-	spid = gtk_editable_get_text(GTK_EDITABLE(self));
-	if (*spid == 0)
-		return;
+	spid = (char *)gtk_editable_get_text(GTK_EDITABLE(self));
+	vlevel = (char *)gtk_editable_get_text(GTK_EDITABLE(vib_level));
 
-	/* In case of a duplicate, this function will remove the already existing spid
-		It does so to add the option to delete entries in case the user wants to.
-	*/
-	if (g_hash_table_contains(g_hash_table_apps, spid))
-		g_hash_table_remove(g_hash_table_apps, spid);
-	else
-		g_hash_table_insert(g_hash_table_apps, g_strdup(spid), g_hash_app_config_struct(spid));
-	
-	g_hash_table_foreach(g_hash_table_apps, g_hash_table_printall, NULL);
+	/* This function may fail if the key already exists,
+		or update the old value of the _same_ key with the new supplied value. */
+	glib_insert_new_value(spid, vlevel);
+
+	/* DEBUG DEBUG DEBUG (: */
+	#ifdef DEBUG
+	print_table_contents();
+	#endif
 }
 
 /* Accept only numbers as proper input */
@@ -136,7 +111,8 @@ static __always_inline void pid_entry_insert_callback(GtkEditable *self,
 }
 
 static void initalize_gtk_signals(GtkWidget *vscale, GtkWidget *checkbtn,
-			GtkWidget *dropdown_display, GtkWidget *process_id_entry)
+			GtkWidget *dropdown_display, GtkWidget *process_id_entry,
+			GtkWidget *pid_vib_level)
 {
 	g_signal_connect(GTK_RANGE(vscale), "value_changed",
 					 	G_CALLBACK(&vibrance_scale_callback),
@@ -146,8 +122,10 @@ static void initalize_gtk_signals(GtkWidget *vscale, GtkWidget *checkbtn,
 	g_signal_connect_after(dropdown_display, "notify::selected",
 				 G_CALLBACK(dropdown_selected_callback), NULL);
 	g_signal_connect(process_id_entry, "activate",
-				G_CALLBACK(pid_entry_submit_callback), NULL);
+				G_CALLBACK(pid_entry_submit_callback), pid_vib_level);
 	g_signal_connect_after(gtk_editable_get_delegate(GTK_EDITABLE(process_id_entry)),
+		"insert-text", G_CALLBACK(pid_entry_insert_callback), NULL);
+	g_signal_connect_after(gtk_editable_get_delegate(GTK_EDITABLE(pid_vib_level)),
 		"insert-text", G_CALLBACK(pid_entry_insert_callback), NULL);
 }
 
@@ -186,7 +164,8 @@ static void gtk_activate(GtkApplication *app, gpointer data)
 	GtkBuilder *build; /* Builder UI */
 	GtkCssProvider *cssprov; /* External CSS theme file */
 	GtkWidget *checkbtn, *vscale, *credit,
-				 *nvi_image, *dropdown_display, *process_id_entry;
+				 *nvi_image, *dropdown_display, *process_id_entry,
+				 *pid_vib_level;
 	const char *str_arr_displays[MAXIMUM_MONITOR_ARRAY_COUNT];
 
 	user_data.user_gdk_display = gdk_display_manager_get_default_display(
@@ -203,13 +182,14 @@ static void gtk_activate(GtkApplication *app, gpointer data)
 			gdk_monitor_get_model(g_list_model_get_item(user_data.glist_monitors, mon)); 
 	}
 
-	g_hash_table_apps = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_app_config_struct_free);
+	glib_new_hash_table();
 
 	/* load GtkWidget objects created by the external XML file */
 	build = gtk_builder_new_from_file("gtkui.xml");
 	win = GTK_WIDGET(gtk_builder_get_object(build, "win"));
 	fixed = GTK_WIDGET(gtk_builder_get_object(build, "fixed"));	
 	process_id_entry = GTK_WIDGET(gtk_builder_get_object(build, "process_list"));
+	pid_vib_level = GTK_WIDGET(gtk_builder_get_object(build, "process_vib_level"));
 	checkbtn = GTK_WIDGET(gtk_builder_get_object(build, "checkbtn"));
 	vscale = GTK_WIDGET(gtk_builder_get_object(build, "vscale"));
 	credit = GTK_WIDGET(gtk_builder_get_object(build, "creditlb"));
@@ -218,13 +198,15 @@ static void gtk_activate(GtkApplication *app, gpointer data)
 	dropdown_display = gtk_drop_down_new_from_strings(str_arr_displays);
 	nvi_image = gtk_image_new_from_file("assets/nvidia-ico.png");
 
-	initalize_gtk_signals(vscale, checkbtn, dropdown_display, process_id_entry);
+	initalize_gtk_signals(vscale, checkbtn, dropdown_display, process_id_entry,
+							pid_vib_level);
 
 	/* FIXME: Avoid this */
 	gtk_widget_unparent(checkbtn);
 	gtk_widget_unparent(vscale);
 	gtk_widget_unparent(credit);
 	gtk_widget_unparent(process_id_entry);
+	gtk_widget_unparent(pid_vib_level);
 
 	/* Position the elements */
 	gtk_fixed_put(GTK_FIXED(fixed), checkbtn, 20, 120);
@@ -233,6 +215,7 @@ static void gtk_activate(GtkApplication *app, gpointer data)
 	gtk_fixed_put(GTK_FIXED(fixed), nvi_image, 230, 10);
 	gtk_fixed_put(GTK_FIXED(fixed), dropdown_display, 20, 80);
 	gtk_fixed_put(GTK_FIXED(fixed), process_id_entry, 20, 280);
+	gtk_fixed_put(GTK_FIXED(fixed),  pid_vib_level, 165, 280);
 	
 	cssprov = gtk_css_provider_new();
 
@@ -260,7 +243,6 @@ int do_init_gtk_window(
 	pthread_spin_lock(&gdisplay.lock);
 	XCloseDisplay(gdisplay.dpy);
 	gdisplay.dpy = NULL;
-	g_hash_table_destroy(g_hash_table_apps);
 	g_thread_unref(gthread_p);
 	g_object_unref(app);
 	free(gdisplay.monitors_conf);

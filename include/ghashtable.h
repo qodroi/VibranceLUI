@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Roi
+ *   Copyright (c) 2025 Roi
 
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,12 +15,20 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef VGUI_H
-#define VGUI_H
 
-#define MAXIMUM_MONITOR_ARRAY_COUNT		15 /* more comfortable in
-			case of a value change in monitors number */
+#ifndef GHASHTABLE_H
+#define GHASHTABLE_H
 
-int do_init_gtk_window();
+#include <glib.h>
 
-#endif /* VGUI_H */
+extern GHashTable *ht;
+
+void glib_new_hash_table();
+gboolean glib_insert_new_value(char *, char *);
+const char *fetch_vlevel_for_spid_ht(char *);
+
+#ifdef DEBUG
+void print_table_contents();
+#endif /* DEBUG */
+
+#endif /* GHASHTABLE_H */

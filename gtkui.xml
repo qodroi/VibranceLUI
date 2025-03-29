@@ -39,6 +39,13 @@
 					</object>
 				</child>
 				<child>
+					<object class="GtkEntry" id="process_vib_level">
+						<property name="placeholder-text">Vibrance</property>
+						<property name="max-length">3</property>
+						<property name="width-chars">10</property>
+					</object>
+				</child>
+				<child>
 					<object class="GtkScale" id="vscale">
 						<property name="orientation">GTK_ORIENTATION_HORIZONTAL</property>
 						<property name="draw-value">TRUE</property>
