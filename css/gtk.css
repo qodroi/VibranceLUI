@@ -33,10 +33,9 @@ checkbutton label {
 	color: black;
 }
 
-/* All widgets within the Box */
-box * {
-	font: 13px Fira Code bold;
-	font-weight: 400;
+* {
+	font: 14px sans-serif bold;
+	color: black;
 }
 
 /* VibranceLUI application's header-bar (title bar) */

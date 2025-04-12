@@ -25,10 +25,10 @@ void glib_new_hash_table()
     ht = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 }
 
-/* Add key and value Or (!) replace (if `key` already exists in the table ) 
+/*  Add key and value to GHashTable _or_ replace (if `key` already exists)
     Returns false if key wasn't already in the table, and true if it was.
 
-    NOTE: This program duplicates a string and allocates memory for it.
+    NOTE: This function duplicates a string and allocates memory for it.
 */
 gboolean glib_insert_new_value(char *spid, char *vlevel)
 {
@@ -38,16 +38,19 @@ gboolean glib_insert_new_value(char *spid, char *vlevel)
     return g_hash_table_insert(ht, g_strdup(spid), g_strdup(vlevel));
 }
 
-/* Fetch the Vibrance level (`vlevel` - value) for the given Process ID `spid` key */
+/* Fetch the Vibrance level for the given Process ID `spid` */
 const char *fetch_vlevel_for_spid_ht(char *spid)
 {
-    if (!spid)
-        return NULL;
-
     return g_hash_table_lookup(ht, spid); /* NULL if spid isn't present. */
 }
 
-/* Returns the number of elements contained in the GHashTable, i.e.
+/* Remove all keys and values off the table */
+__always_inline void glib_clear_hash_table()
+{
+    return g_hash_table_remove_all(ht);
+}
+
+/* Return the number of elements contained in the GHashTable, i.e.
     Number of processes tracked. */
 static __always_inline guint glib_pids_in_ht()
 {

@@ -24,14 +24,6 @@
 					</object>
 				</child>
 				<child>
-					<object class="GtkLabel" id="releasebeta">
-						<property name="label">Beta</property>
-						<attributes>
-							<attribute name="weight" value="PANGO_WEIGHT_THIN"/>
-						</attributes>
-					</object>
-				</child>
-				<child>
 					<object class="GtkEntry" id="process_list">
 						<property name="placeholder-text">Process ID</property>
 						<property name="max-length">7</property>
